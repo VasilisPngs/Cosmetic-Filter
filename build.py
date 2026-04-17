@@ -3,6 +3,7 @@ import urllib.request
 SOURCES = [
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/general_elemhide.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/specific.txt"
+    "https://www.void.gr/kargig/void-gr-filters.txt"
 ]
 
 def fetch_data(url):
