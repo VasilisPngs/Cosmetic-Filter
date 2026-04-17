@@ -19,7 +19,6 @@ for url in SOURCES:
             line = line.strip()
             if not line or line.startswith('!'):
                 continue
-            # Κρατάμε ΑΥΣΤΗΡΑ μόνο DOM/Cosmetic κανόνες
             if '##' in line or '#?#' in line or '#@#' in line or '#%#' in line:
                 cosmetic_rules.add(line)
     except:
@@ -28,7 +27,5 @@ for url in SOURCES:
 final_list = sorted(list(cosmetic_rules))
 
 with open("cosmetic.txt", "w", encoding="utf-8") as f:
-    f.write("! Title: Custom Cosmetic Filter\n")
-    f.write("! Description: Pure DOM manipulation for hiding elements and collapsing empty ad spaces.\n")
     for r in final_list:
         f.write(f"{r}\n")
