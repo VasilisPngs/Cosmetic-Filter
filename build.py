@@ -1,16 +1,17 @@
 import urllib.request
 
-GLOBAL_SOURCES = [
+SOURCES = [
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/allowlist.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/allowlist_stealth.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/antiadblock.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/banner_sizes.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/content_blocker.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/cryptominers.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/general_elemhide.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/general_extensions.txt",
-    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/specific.txt"
-]
-
-LOCAL_SOURCES = [
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/general_url.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/replace.txt",
+    "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/specific.txt",
     "https://www.void.gr/kargig/void-gr-filters.txt"
 ]
 
@@ -22,26 +23,20 @@ def fetch_data(url):
     except:
         return []
 
-final_rules = set()
+cosmetic_rules = set()
 
-# 1. Global Sources: Keep strictly Cosmetic / DOM rules
-for url in GLOBAL_SOURCES:
-    for line in fetch_data(url):
-        line = line.strip()
-        if not line or line.startswith('!'):
-            continue
-        if '##' in line or '#?#' in line or '#@#' in line or '#%#' in line:
-            final_rules.add(line)
+for url in SOURCES:
+    try:
+        for line in fetch_data(url):
+            line = line.strip()
+            if not line or line.startswith('!'):
+                continue
+            if '##' in line or '#?#' in line or '#@#' in line or '#%#' in line:
+                cosmetic_rules.add(line)
+    except:
+        pass
 
-# 2. Local Sources (Greek): Keep EVERYTHING (Network + Cosmetic)
-for url in LOCAL_SOURCES:
-    for line in fetch_data(url):
-        line = line.strip()
-        if not line or line.startswith('!'):
-            continue
-        final_rules.add(line)
-
-final_list = sorted(list(final_rules))
+final_list = sorted(list(cosmetic_rules))
 
 with open("cosmetic.txt", "w", encoding="utf-8") as f:
     for r in final_list:
