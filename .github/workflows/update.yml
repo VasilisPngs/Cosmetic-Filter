@@ -1,4 +1,4 @@
-name: Build Cosmetic Filter
+name: Build Base Cosmetic Filter
 
 on:
   schedule:
@@ -23,5 +23,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add cosmetic.txt
-          git commit -m "Update cosmetic rules" || exit 0
+          git commit -m "Update base cosmetic rules" || exit 0
           git push
