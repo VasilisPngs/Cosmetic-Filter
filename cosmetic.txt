@@ -2122,6 +2122,7 @@ arch-ware.org##.post center > a[rel="nofollow"]
 arch2o.com###text-85.widget_text
 arch2o.com###text-86.widget_text
 architonic.com###header-top
+archive.fo,archive.is,archive.li,archive.md,archive.ph,archive.today,archive.vn,btdig.com#%#//scriptlet('prevent-setInterval', 'fetch')
 archive.ph##div[style]:has(> div[id^="iqadtile"]:only-child)
 archivebate.com###detect
 archivebate.com#%#//scriptlet('prevent-fetch', 'pagead2.googlesyndication.com')
@@ -5915,6 +5916,7 @@ embed.dugout.com##div[data-testid="keep-watching"]
 embed.watchasian.to#%#//scriptlet("prevent-window-open")
 embed.wcostream.com#$##announcement { display: block !important; }
 embed.wcostream.com#%#(()=>{if(!location.href.includes("://embed.wcostream.com/inc/embed/index.php?file="))return;const e=`/inc/embed/video-js.php${location.search}`;location.href=e})();
+embed.wcostream.com#%#//scriptlet('abort-on-property-read', 'AdblockShield')
 embed.wcostream.com#%#//scriptlet('prevent-fetch', 'pubadx-ad.js')
 embed.wcostream.com#%#//scriptlet('trusted-create-element', 'head', 'script', '', '(()=>{if(!location.href.includes("://embed.wcostream.com/inc/embed/index.php?file="))return;const e=`/inc/embed/video-js.php${location.search}`;location.href=e})();')
 embed.wcostream.com#@#.ad-unit:not(.textads)
