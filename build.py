@@ -26,15 +26,16 @@ def fetch_data(url):
     except Exception:
         return []
 
-cosmetic_rules = set()
+rules = set()
 
 for url in SOURCES:
     for line in fetch_data(url):
         line = line.strip()
         if not line or line.startswith("!"):
             continue
-        if "##" in line or "#?#" in line or "#@#" in line or "#%#" in line:
-            cosmetic_rules.add(line)
+        if line.startswith("||"):
+            continue
+        rules.add(line)
 
 with open("cosmetic.txt", "w", encoding="utf-8", newline="\n") as f:
-    f.writelines(r + "\n" for r in sorted(cosmetic_rules))
+    f.writelines(r + "\n" for r in sorted(rules))
