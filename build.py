@@ -1,7 +1,8 @@
-import urllib.request
 import re
+import urllib.request
+from urllib.parse import urljoin
 
-SOURCES_BASE = [
+SOURCES = [
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/adservers.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/adservers_firstparty.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/allowlist.txt",
@@ -16,7 +17,7 @@ SOURCES_BASE = [
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/general_url.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/replace.txt",
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/specific.txt",
-    "https://raw.githubusercontent.com/kargig/greek-adblockplus-filter/master/void-gr-filters.txt"
+    "https://raw.githubusercontent.com/kargig/greek-adblockplus-filter/master/void-gr-filters.txt",
 ]
 
 PLATFORMS = {
@@ -36,17 +37,56 @@ PLATFORMS = {
     "cap_html_filtering",
 }
 
+TOKEN_RE = re.compile(r"&&|\|\||!|\(|\)|[A-Za-z_][A-Za-z0-9_]*")
+
+
 def eval_condition(expr):
-    expr = expr.strip()
-    if expr.startswith("(") and expr.endswith(")"):
-        expr = expr[1:-1].strip()
-    if "||" in expr:
-        return any(eval_condition(p) for p in expr.split("||"))
-    if "&&" in expr:
-        return all(eval_condition(p) for p in expr.split("&&"))
-    if expr.startswith("!"):
-        return not eval_condition(expr[1:])
-    return expr.strip() in PLATFORMS
+    expr = re.sub(r"\s+", "", expr)
+    tokens = TOKEN_RE.findall(expr)
+
+    def parse_or(pos):
+        value, pos = parse_and(pos)
+        while pos < len(tokens) and tokens[pos] == "||":
+            rhs, pos = parse_and(pos + 1)
+            value = value or rhs
+        return value, pos
+
+    def parse_and(pos):
+        value, pos = parse_unary(pos)
+        while pos < len(tokens) and tokens[pos] == "&&":
+            rhs, pos = parse_unary(pos + 1)
+            value = value and rhs
+        return value, pos
+
+    def parse_unary(pos):
+        if pos < len(tokens) and tokens[pos] == "!":
+            value, pos = parse_unary(pos + 1)
+            return not value, pos
+        return parse_primary(pos)
+
+    def parse_primary(pos):
+        if pos >= len(tokens):
+            return False, pos
+
+        token = tokens[pos]
+
+        if token == "(":
+            value, pos = parse_or(pos + 1)
+            if pos < len(tokens) and tokens[pos] == ")":
+                return value, pos + 1
+            return False, pos
+
+        if token in PLATFORMS:
+            return True, pos + 1
+
+        return False, pos + 1
+
+    try:
+        value, pos = parse_or(0)
+        return value and pos == len(tokens)
+    except Exception:
+        return False
+
 
 def fetch_data(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -56,32 +96,70 @@ def fetch_data(url):
     except Exception:
         return []
 
-def parse_lines(lines):
-    result = []
+
+def process_source(url, rules, visited):
+    if url in visited:
+        return
+    visited.add(url)
+
+    lines = fetch_data(url)
     active = [True]
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("!#if "):
-            active.append(eval_condition(stripped[5:]))
-        elif stripped.startswith("!#else"):
-            if len(active) > 1:
-                active[-1] = not active[-1]
-        elif stripped.startswith("!#endif"):
+    condition_stack = []
+
+    for raw_line in lines:
+        stripped = raw_line.strip()
+
+        if not stripped:
+            continue
+
+        if stripped.startswith("!#if"):
+            condition = stripped[4:].strip()
+            condition_value = eval_condition(condition)
+            condition_stack.append(condition_value)
+            active.append(active[-1] and condition_value)
+            continue
+
+        if stripped.startswith("!#else"):
+            if len(active) > 1 and condition_stack:
+                condition_value = condition_stack[-1]
+                active[-1] = active[-2] and (not condition_value)
+            continue
+
+        if stripped.startswith("!#endif"):
             if len(active) > 1:
                 active.pop()
-        elif all(active):
-            result.append(stripped)
-    return result
+            if condition_stack:
+                condition_stack.pop()
+            continue
+
+        if stripped.startswith("!#include"):
+            if active[-1]:
+                include_target = stripped[len("!#include"):].strip()
+                if include_target:
+                    include_url = urljoin(url, include_target)
+                    process_source(include_url, rules, visited)
+            continue
+
+        if stripped.startswith("!+"):
+            continue
+
+        if stripped.startswith("!"):
+            continue
+
+        if not active[-1]:
+            continue
+
+        if stripped.startswith("||") or stripped.startswith("@@||"):
+            continue
+
+        rules.add(stripped)
+
 
 rules = set()
+visited = set()
 
-for url in SOURCES_BASE:
-    for line in parse_lines(fetch_data(url)):
-        if not line or line.startswith("!"):
-            continue
-        if line.startswith("||"):
-            continue
-        rules.add(line)
+for url in SOURCES:
+    process_source(url, rules, visited)
 
 with open("cosmetic.txt", "w", encoding="utf-8", newline="\n") as f:
-    f.writelines(r + "\n" for r in sorted(rules))
+    f.write("\n".join(sorted(rules)) + "\n")
