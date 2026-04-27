@@ -1,6 +1,8 @@
 import re
 import urllib.request
 from urllib.parse import urljoin
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
 
 SOURCES = [
     "https://raw.githubusercontent.com/AdguardTeam/AdguardFilters/master/BaseFilter/sections/adservers.txt",
@@ -67,18 +69,14 @@ def eval_condition(expr):
     def parse_primary(pos):
         if pos >= len(tokens):
             return False, pos
-
         token = tokens[pos]
-
         if token == "(":
             value, pos = parse_or(pos + 1)
             if pos < len(tokens) and tokens[pos] == ")":
                 return value, pos + 1
             return False, pos
-
         if token in PLATFORMS:
             return True, pos + 1
-
         return False, pos + 1
 
     try:
@@ -88,13 +86,17 @@ def eval_condition(expr):
         return False
 
 
-def fetch_data(url):
+@lru_cache(maxsize=None)
+def _fetch_data(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        return tuple(response.read().decode("utf-8", errors="replace").splitlines())
+
+def fetch_data(url):
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            return response.read().decode("utf-8", errors="replace").splitlines()
+        return _fetch_data(url)
     except Exception:
-        return []
+        return tuple()
 
 
 def process_source(url, rules, visited):
@@ -102,36 +104,29 @@ def process_source(url, rules, visited):
         return
     visited.add(url)
 
-    lines = fetch_data(url)
     active = [True]
     condition_stack = []
 
-    for raw_line in lines:
+    for raw_line in fetch_data(url):
         stripped = raw_line.strip()
-
         if not stripped:
             continue
-
         if stripped.startswith("!#if"):
             condition = stripped[4:].strip()
             condition_value = eval_condition(condition)
             condition_stack.append(condition_value)
             active.append(active[-1] and condition_value)
             continue
-
         if stripped.startswith("!#else"):
             if len(active) > 1 and condition_stack:
-                condition_value = condition_stack[-1]
-                active[-1] = active[-2] and (not condition_value)
+                active[-1] = active[-2] and (not condition_stack[-1])
             continue
-
         if stripped.startswith("!#endif"):
             if len(active) > 1:
                 active.pop()
             if condition_stack:
                 condition_stack.pop()
             continue
-
         if stripped.startswith("!#include"):
             if active[-1]:
                 include_target = stripped[len("!#include"):].strip()
@@ -139,27 +134,27 @@ def process_source(url, rules, visited):
                     include_url = urljoin(url, include_target)
                     process_source(include_url, rules, visited)
             continue
-
-        if stripped.startswith("!+"):
-            continue
-
         if stripped.startswith("!"):
             continue
-
         if not active[-1]:
             continue
-
         if stripped.startswith("||") or stripped.startswith("@@||"):
             continue
-
         rules.add(stripped)
 
 
-rules = set()
-visited = set()
+def process_source_safe(url):
+    local_rules = set()
+    process_source(url, local_rules, set())
+    return local_rules
 
-for url in SOURCES:
-    process_source(url, rules, visited)
+
+rules = set()
+
+with ThreadPoolExecutor(max_workers=8) as executor:
+    futures = {executor.submit(process_source_safe, url): url for url in SOURCES}
+    for future in as_completed(futures):
+        rules.update(future.result())
 
 with open("cosmetic.txt", "w", encoding="utf-8", newline="\n") as f:
     f.write("\n".join(sorted(rules)) + "\n")
